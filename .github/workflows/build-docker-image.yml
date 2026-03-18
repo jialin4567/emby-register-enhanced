@@ -3,9 +3,10 @@ name: Build and Push Docker Image
 on:
   push:
     paths-ignore:
-      - '**.md'  # 忽略Markdown文件的变更
+      - '**.md'  # 忽略 Markdown 文件的变更
     branches:
-      - main  # 仅在main分支触发
+      - main  # 仅在 main 分支触发
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
   build-and-push:
@@ -38,7 +39,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=sha
-            type=raw,value=latest,enable={{is_default_branch}}  # 添加latest标签
+            type=raw,value=latest,enable={{is_default_branch}}  # 添加 latest 标签
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -48,5 +49,3 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-  
