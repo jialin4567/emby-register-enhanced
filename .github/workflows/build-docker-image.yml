@@ -39,7 +39,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=sha
-            type=raw,value=latest,enable={{is_default_branch}}  # 添加 latest 标签
+            type=raw,value=latest
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
