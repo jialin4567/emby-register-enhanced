@@ -1,0 +1,181 @@
+{% extends 'layout.html' %}
+{% block title %}推送通知{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-bell me-2"></i>推送通知</h1>
+    <p>配置推送渠道，管理报告计划，通过 Telegram Bot 远程控制</p>
+</div>
+
+<div id="alertBox" class="mb-3"></div>
+
+<!-- Channel Status Cards -->
+<div class="row g-3 mb-4">
+    {% set channels = [
+        ('Telegram', 'TG_BOT_TOKEN', 'bi-telegram', '#0088cc'),
+        ('企业微信', 'WECOM_WEBHOOK', 'bi-chat-dots', '#07c160'),
+        ('钉钉', 'DINGTALK_WEBHOOK', 'bi-phone', '#0066ff'),
+        ('Server酱', 'SERVERCHAN_KEY', 'bi-envelope', '#ff6600'),
+        ('飞书', 'FEISHU_WEBHOOK', 'bi-send', '#3370ff'),
+    ] %}
+    {% for name, env_var, icon, color in channels %}
+    <div class="col-6 col-lg">
+        <div class="channel-card text-center {% if env_vars.get(env_var) %}configured{% endif %}">
+            <i class="{{ icon }} fs-2 mb-2" style="color:{{ color }}"></i>
+            <div class="fw-semibold small">{{ name }}</div>
+            {% if env_vars.get(env_var) %}
+                <span class="badge badge-active mt-1 px-2 rounded-pill" style="font-size:.7rem">已配置</span>
+            {% else %}
+                <span class="badge badge-expired mt-1 px-2 rounded-pill" style="font-size:.7rem">未配置</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row g-3">
+    <!-- Manual send -->
+    <div class="col-lg-6">
+        <div class="card p-3 h-100">
+            <h6 class="mb-3" style="color:#94a3b8"><i class="bi bi-send me-2"></i>手动发送</h6>
+            <div class="d-flex gap-2 mb-3">
+                <button class="btn btn-sm btn-outline-secondary" onclick="testNotify()">
+                    <i class="bi bi-check-circle me-1"></i>发送测试消息
+                </button>
+            </div>
+            <hr style="border-color:#2d3148">
+            <p class="small text-muted mb-2">立即发送报告：</p>
+            <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-sm btn-primary" onclick="sendReport('daily')">日报</button>
+                <button class="btn btn-sm btn-primary" onclick="sendReport('weekly')">周报</button>
+                <button class="btn btn-sm btn-primary" onclick="sendReport('monthly')">月报</button>
+            </div>
+            <div id="previewBox" class="mt-3" style="display:none">
+                <p class="small text-muted mb-1">报告预览：</p>
+                <pre id="previewText" style="background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:.75rem;font-size:.75rem;color:#94a3b8;white-space:pre-wrap;max-height:200px;overflow-y:auto"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule info -->
+    <div class="col-lg-6">
+        <div class="card p-3 h-100">
+            <h6 class="mb-3" style="color:#94a3b8"><i class="bi bi-clock me-2"></i>推送计划</h6>
+            <div class="mb-3">
+                <p class="small text-muted mb-1">当前计划：</p>
+                <code style="color:#818cf8">{{ schedule or '未配置' }}</code>
+                <p class="small text-muted mt-2 mb-1">推送时间：每天 {{ report_hour }}:00（北京时间）</p>
+            </div>
+            <hr style="border-color:#2d3148">
+            <p class="small text-muted mb-2">通过环境变量配置：</p>
+            <pre style="background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:.75rem;font-size:.72rem;color:#94a3b8;white-space:pre-wrap">REPORT_SCHEDULE=daily,weekly,monthly
+REPORT_HOUR=8</pre>
+        </div>
+    </div>
+</div>
+
+<!-- Telegram Bot Guide -->
+<div class="card p-3 mt-3">
+    <h6 class="mb-3" style="color:#94a3b8"><i class="bi bi-robot me-2"></i>Telegram Bot 管理指令</h6>
+    <div class="row g-2">
+        {% set cmds = [
+            ('/status', '服务器概览，用户总数、在线人数'),
+            ('/online', '当前在线播放详情'),
+            ('/users', '所有用户列表及状态'),
+            ('/expiring', '3天内即将到期用户'),
+            ('/renew &lt;用户名&gt; &lt;天数&gt;', '给用户续期，例：/renew alice 30'),
+            ('/lock &lt;用户名&gt;', '锁定用户（在Emby上禁用）'),
+            ('/unlock &lt;用户名&gt;', '解锁用户'),
+            ('/lockexpired', '一键锁定所有到期用户'),
+            ('/report', '立即发送一份日报'),
+        ] %}
+        {% for cmd, desc in cmds %}
+        <div class="col-md-6">
+            <div class="stream-card d-flex gap-3 align-items-start">
+                <code style="color:#818cf8;white-space:nowrap;min-width:180px">{{ cmd }}</code>
+                <span class="small text-muted">{{ desc }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="mt-3 p-3" style="background:#0f1117;border-radius:8px;border:1px solid #2d3148">
+        <p class="small text-muted mb-1">配置 Bot 所需环境变量：</p>
+        <pre style="font-size:.72rem;color:#94a3b8;margin:0">TG_BOT_TOKEN=your_bot_token        # 从 @BotFather 获取
+TG_ADMIN_CHAT_ID=your_chat_id      # 从 @userinfobot 获取（只有此ID可发指令）</pre>
+    </div>
+</div>
+
+<!-- All channels config reference -->
+<div class="card p-3 mt-3">
+    <h6 class="mb-3" style="color:#94a3b8"><i class="bi bi-gear me-2"></i>全渠道环境变量参考</h6>
+    <pre style="background:#0f1117;border:1px solid #2d3148;border-radius:8px;padding:1rem;font-size:.75rem;color:#94a3b8;white-space:pre-wrap"># Telegram（Bot指令 + 推送）
+TG_BOT_TOKEN=123456:ABC-your-token
+TG_ADMIN_CHAT_ID=123456789
+
+# 企业微信群机器人
+WECOM_WEBHOOK=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+
+# 钉钉群机器人
+DINGTALK_WEBHOOK=https://oapi.dingtalk.com/robot/send?access_token=xxx
+DINGTALK_SECRET=SECxxx   # 如果开启了加签，填这个；否则留空
+
+# Server酱（微信推送）
+SERVERCHAN_KEY=SCTxxx
+
+# 飞书群机器人
+FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+
+# 报告计划
+REPORT_SCHEDULE=daily,weekly,monthly   # 可选填其中几个
+REPORT_HOUR=8                          # 北京时间几点推送，默认8</pre>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+// ── CSRF helper ────────────────────────────────────────────
+function getCsrfToken() {
+    const match = document.cookie.split('; ').find(r => r.startsWith('csrf_token='));
+    return match ? decodeURIComponent(match.split('=')[1]) : '';
+}
+function apiFetch(url, options = {}) {
+    options.headers = Object.assign({
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+    }, options.headers || {});
+    return fetch(url, options);
+}
+async function testNotify() {
+    showAlert('发送中...', 'info');
+    const res = await apiFetch('/api/notify/test', {method:'POST'});
+    const data = await res.json();
+    if (data.success) {
+        const ch = Object.entries(data.channels).map(([k,v]) => `${k}:${v?'✅':'❌'}`).join(' ');
+        showAlert(`测试发送完成 — ${ch}`, 'success');
+    } else {
+        showAlert(data.message, 'danger');
+    }
+}
+
+async function sendReport(period) {
+    showAlert('生成报告中...', 'info');
+    const res = await apiFetch('/api/notify/report', {
+        method:'POST',
+        body: JSON.stringify({period})
+    });
+    const data = await res.json();
+    if (data.success) {
+        const ch = Object.entries(data.channels).map(([k,v]) => `${k}:${v?'✅':'❌'}`).join(' ');
+        showAlert(`报告已发送 — ${ch}`, 'success');
+        document.getElementById('previewBox').style.display = 'block';
+        document.getElementById('previewText').textContent = data.preview + '...';
+    } else {
+        showAlert(data.message, 'danger');
+    }
+}
+
+function showAlert(msg, type) {
+    const box = document.getElementById('alertBox');
+    box.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show">${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`;
+}
+</script>
+{% endblock %}

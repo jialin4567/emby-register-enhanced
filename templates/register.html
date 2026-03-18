@@ -1,0 +1,155 @@
+{% extends 'layout.html' %}
+{% block title %}Emby 账号注册{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <h3 class="card-title text-center">注册 Emby 账号</h3>
+        {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        <p class="text-muted">请输入您希望使用的用户名和密码。</p>
+        <form method="post" id="registerForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="token" value="{{ token }}">
+            <div class="mb-3">
+                <label for="username" class="form-label">用户名</label>
+                <input type="text" 
+                       class="form-control" 
+                       id="username" 
+                       name="username" 
+                       required 
+                       minlength="4" 
+                       maxlength="32" 
+                       pattern="[a-zA-Z0-9]+"
+                       title="用户名只能包含英文字母和数字，长度为4-32位。">
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">密码</label>
+                <input type="password" 
+                       class="form-control" 
+                       id="password" 
+                       name="password" 
+                       required 
+                       minlength="6" 
+                       maxlength="32" 
+                       title="密码长度6-32位">
+                <div class="form-text">密码长度6-32位，不能是常见弱密码</div>
+            </div>
+            <div class="mb-3">
+                <label for="confirm_password" class="form-label">确认密码</label>
+                <input type="password" 
+                       class="form-control" 
+                       id="confirm_password" 
+                       name="confirm_password" 
+                       required 
+                       minlength="6" 
+                       maxlength="32" 
+                       title="请再次输入密码">
+                <div class="invalid-feedback" id="password-error">
+                    两次密码输入不一致
+                </div>
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary" id="submitBtn">注册</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// This function runs automatically after the page content has loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. Get the browser's User-Agent string in lower case
+    const userAgent = navigator.userAgent.toLowerCase();
+
+    // 2. Check if it contains 'qq'
+    if (userAgent.includes('qq') || userAgent.includes('micromessenger')) {
+        // 3. If it does, create the warning alert element
+        const warningDiv = document.createElement('div');
+        warningDiv.className = 'alert alert-warning d-flex align-items-center';
+        warningDiv.setAttribute('role', 'alert');
+        warningDiv.innerHTML = `
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <div>
+                检测到您可能正在使用QQ或微信内置浏览器。请您复制链接到 <strong>Chrome</strong> 或 <strong>Safari</strong> 浏览器中打开。
+            </div>
+        `;
+
+        // 4. Find the target location and insert the warning at the top
+        const cardBody = document.querySelector('.card-body');
+        // Insert the warning message right after the title
+        cardBody.insertBefore(warningDiv, cardBody.children[1]);
+    }
+
+    // Password validation logic
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirm_password');
+    const submitBtn = document.getElementById('submitBtn');
+    const passwordError = document.getElementById('password-error');
+    const registerForm = document.getElementById('registerForm');
+
+    // Common weak passwords list
+    const weakPasswords = [
+        '123456', '123456789', '12345678', '1234567', '123123',
+        'password', 'qwerty', 'abc123', '111111', '000000',
+        '1qaz2wsx', 'admin', 'root', '888888', '666666'
+    ];
+
+    function validatePassword() {
+        const password = passwordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+        let isValid = true;
+        let errorMessage = '';
+
+        // Check password length
+        if (password.length < 6) {
+            isValid = false;
+            errorMessage = '密码长度至少6位';
+        }
+        else if (password.length > 32) {
+            isValid = false;
+            errorMessage = '密码长度不能超过32位';
+        }
+        // Check for weak passwords
+        else if (weakPasswords.includes(password.toLowerCase())) {
+            isValid = false;
+            errorMessage = '密码过于简单，请使用更安全的密码';
+        }
+        // Check password confirmation
+        else if (confirmPassword && password !== confirmPassword) {
+            isValid = false;
+            errorMessage = '两次密码输入不一致';
+        }
+
+        // Update UI
+        if (!isValid && (password || confirmPassword)) {
+            confirmPasswordInput.classList.add('is-invalid');
+            passwordError.textContent = errorMessage;
+            passwordError.style.display = 'block';
+        } else if (password && confirmPassword && password === confirmPassword) {
+            confirmPasswordInput.classList.remove('is-invalid');
+            confirmPasswordInput.classList.add('is-valid');
+            passwordError.style.display = 'none';
+        } else {
+            confirmPasswordInput.classList.remove('is-invalid', 'is-valid');
+            passwordError.style.display = 'none';
+        }
+
+        return isValid;
+    }
+
+    // Add event listeners
+    passwordInput.addEventListener('input', validatePassword);
+    confirmPasswordInput.addEventListener('input', validatePassword);
+
+    // Form submission validation
+    registerForm.addEventListener('submit', function(e) {
+        if (!validatePassword()) {
+            e.preventDefault();
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

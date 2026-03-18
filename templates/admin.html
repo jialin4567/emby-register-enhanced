@@ -1,0 +1,108 @@
+{% extends 'layout.html' %}
+{% block title %}Token 管理{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-ticket-perforated me-2"></i>Token 管理</h1>
+    <p>生成带有效期的注册链接，分发给需要注册的用户</p>
+</div>
+
+<!-- Generate form -->
+<div class="card p-3 mb-4">
+    <h6 class="mb-3" style="color:#94a3b8">生成新 Token</h6>
+    <form method="post" action="{{ url_for('generate_token') }}" class="row g-2 align-items-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="col-sm-3">
+            <label class="form-label small text-muted">有效期</label>
+            <select name="validity" class="form-select form-select-sm">
+                <option value="permanent">永不过期</option>
+                <option value="7d">7 天</option>
+                <option value="30d">30 天</option>
+            </select>
+        </div>
+        <div class="col-sm-2">
+            <label class="form-label small text-muted">数量</label>
+            <input type="number" name="count" value="1" min="1" max="50" class="form-control form-control-sm">
+        </div>
+        <div class="col-sm-4">
+            <label class="form-label small text-muted">备注（可选）</label>
+            <input type="text" name="note" placeholder="如：给某某的token" class="form-control form-control-sm" maxlength="100">
+        </div>
+        <div class="col-sm-3">
+            <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-plus-circle me-1"></i>生成</button>
+        </div>
+    </form>
+</div>
+
+{% if public_access_url == 'YOUR_DOMAIN.com' %}
+<div class="alert alert-danger">⚠️ 请设置 <code>PUBLIC_ACCESS_URL</code> 环境变量</div>
+{% endif %}
+
+<!-- Token table -->
+<div class="card p-3">
+    <h6 class="mb-3" style="color:#94a3b8">Token 列表</h6>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>注册链接</th>
+                    <th>有效期</th>
+                    <th>状态</th>
+                    <th>注册用户</th>
+                    <th>备注</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for token in tokens %}
+                <tr>
+                    <td style="max-width:320px; word-break:break-all; font-size:.78rem; font-family:monospace; color:#94a3b8">
+                        {{ public_access_url }}/emby?token={{ token.full_signed_token }}
+                    </td>
+                    <td class="small text-muted">{{ token.expires_at or '永久' }}</td>
+                    <td>
+                        {% if token.is_used %}
+                            <span class="badge badge-used px-2 py-1 rounded-pill small">已使用</span>
+                        {% elif token.is_expired %}
+                            <span class="badge badge-expired px-2 py-1 rounded-pill small">已过期</span>
+                        {% else %}
+                            <span class="badge badge-unused px-2 py-1 rounded-pill small">可用</span>
+                        {% endif %}
+                    </td>
+                    <td class="small">{{ token.username or '—' }}</td>
+                    <td class="small text-muted">{{ token.note or '—' }}</td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            {% if not token.is_used and not token.is_expired %}
+                            <button class="btn btn-sm btn-outline-info py-0 px-2"
+                                onclick="copyLink('{{ public_access_url }}/emby?token={{ token.full_signed_token }}', this)">
+                                复制
+                            </button>
+                            {% endif %}
+                            <form method="post" action="{{ url_for('delete_token', token_id=token.id) }}" class="mb-0"
+                                  onsubmit="return confirm('确定删除？')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">删除</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted">暂无 Token</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="d-flex justify-content-center mt-3">{{ pagination.links }}</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function copyLink(url, btn) {
+    navigator.clipboard.writeText(url).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = '已复制'; btn.classList.add('btn-success'); btn.classList.remove('btn-outline-info');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('btn-success'); btn.classList.add('btn-outline-info'); }, 2000);
+    });
+}
+</script>
+{% endblock %}

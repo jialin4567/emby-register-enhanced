@@ -1,0 +1,183 @@
+{% extends 'layout.html' %}
+{% block title %}用户管理{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-start">
+    <div>
+        <h1><i class="bi bi-people me-2"></i>用户管理</h1>
+        <p>批量续期、锁定/解锁，一键处理到期用户</p>
+    </div>
+    <button class="btn btn-sm btn-outline-warning" onclick="autoLockExpired()">
+        <i class="bi bi-lock me-1"></i>一键锁定所有到期
+    </button>
+</div>
+
+<!-- Bulk actions bar -->
+<div class="card p-3 mb-3 d-flex flex-row align-items-center gap-3 flex-wrap" id="bulkBar" style="display:none!important">
+    <span class="text-muted small"><span id="selectedCount">0</span> 人已选</span>
+    <div class="d-flex align-items-center gap-2">
+        <input type="number" id="renewDays" value="30" min="1" max="3650" class="form-control form-control-sm" style="width:80px" placeholder="天数">
+        <button class="btn btn-sm btn-primary" onclick="bulkRenew()"><i class="bi bi-calendar-plus me-1"></i>续期</button>
+    </div>
+    <button class="btn btn-sm btn-warning" onclick="bulkLock('lock')"><i class="bi bi-lock me-1"></i>锁定</button>
+    <button class="btn btn-sm btn-success" onclick="bulkLock('unlock')"><i class="bi bi-unlock me-1"></i>解锁</button>
+</div>
+
+<div id="alertBox"></div>
+
+<div class="card p-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0" style="color:#94a3b8">注册用户列表</h6>
+        <div class="d-flex gap-2">
+            <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="搜索用户名..." style="width:180px" oninput="filterTable()">
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadUsers()"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th><input type="checkbox" id="selectAll" onchange="toggleAll(this)"></th>
+                    <th>用户名</th>
+                    <th>注册时间</th>
+                    <th>到期时间</th>
+                    <th>最后续期</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="userTableBody">
+                <tr><td colspan="7" class="text-center text-muted">加载中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// ── CSRF helper ────────────────────────────────────────────
+function getCsrfToken() {
+    const match = document.cookie.split('; ').find(r => r.startsWith('csrf_token='));
+    return match ? decodeURIComponent(match.split('=')[1]) : '';
+}
+function apiFetch(url, options = {}) {
+    options.headers = Object.assign({
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+    }, options.headers || {});
+    return fetch(url, options);
+}
+let allUsers = [];
+
+async function loadUsers() {
+    const res = await apiFetch('/api/users/list');
+    allUsers = await res.json();
+    renderTable(allUsers);
+}
+
+function renderTable(users) {
+    const tbody = document.getElementById('userTableBody');
+    if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">暂无用户</td></tr>';
+        return;
+    }
+    tbody.innerHTML = users.map(u => `
+        <tr data-id="${u.id}" class="${u.is_expired ? 'opacity-75' : ''}">
+            <td><input type="checkbox" class="user-check" value="${u.id}" onchange="updateBulkBar()"></td>
+            <td class="fw-semibold">${u.username}</td>
+            <td class="small text-muted">${u.registered_at.slice(0,10) || '—'}</td>
+            <td class="small ${u.is_expired ? 'text-danger' : ''}">${typeof u.expires_at === 'string' ? u.expires_at.slice(0,10) : u.expires_at}</td>
+            <td class="small text-muted">${u.last_renewed_at ? u.last_renewed_at.slice(0,10) : '—'}</td>
+            <td>
+                ${u.is_locked
+                    ? '<span class="badge badge-locked px-2 py-1 rounded-pill small">已锁定</span>'
+                    : u.is_expired
+                        ? '<span class="badge badge-expired px-2 py-1 rounded-pill small">已到期</span>'
+                        : '<span class="badge badge-active px-2 py-1 rounded-pill small">正常</span>'
+                }
+            </td>
+            <td>
+                <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="singleRenew(${u.id})">续期</button>
+                    ${u.is_locked
+                        ? `<button class="btn btn-sm btn-outline-success py-0 px-2" onclick="singleLock(${u.id},'unlock')">解锁</button>`
+                        : `<button class="btn btn-sm btn-outline-warning py-0 px-2" onclick="singleLock(${u.id},'lock')">锁定</button>`
+                    }
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filterTable() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    renderTable(allUsers.filter(u => u.username.toLowerCase().includes(q)));
+}
+
+function getSelectedIds() {
+    return [...document.querySelectorAll('.user-check:checked')].map(e => parseInt(e.value));
+}
+
+function updateBulkBar() {
+    const ids = getSelectedIds();
+    const bar = document.getElementById('bulkBar');
+    bar.style.display = ids.length > 0 ? 'flex' : 'none';
+    document.getElementById('selectedCount').textContent = ids.length;
+}
+
+function toggleAll(cb) {
+    document.querySelectorAll('.user-check').forEach(c => c.checked = cb.checked);
+    updateBulkBar();
+}
+
+async function bulkRenew() {
+    const ids = getSelectedIds();
+    const days = parseInt(document.getElementById('renewDays').value);
+    if (!ids.length) return;
+    const res = await apiFetch('/api/users/renew', {method:'POST', body: JSON.stringify({user_ids: ids, days})});
+    const data = await res.json();
+    showAlert(data.success ? `已续期 ${data.renewed} 个用户` : data.message, data.success ? 'success' : 'danger');
+    loadUsers();
+}
+
+async function bulkLock(action) {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    const res = await apiFetch('/api/users/lock', {method:'POST', body: JSON.stringify({user_ids: ids, action})});
+    const data = await res.json();
+    showAlert(data.success ? `已${action === 'lock' ? '锁定' : '解锁'} ${data.processed} 个用户` : data.message, data.success ? 'success' : 'danger');
+    loadUsers();
+}
+
+async function singleRenew(id) {
+    const days = parseInt(prompt('续期天数（如 30）:', '30'));
+    if (!days || days < 1) return;
+    const res = await apiFetch('/api/users/renew', {method:'POST', body: JSON.stringify({user_ids: [id], days})});
+    const data = await res.json();
+    showAlert(data.success ? '续期成功' : data.message, data.success ? 'success' : 'danger');
+    loadUsers();
+}
+
+async function singleLock(id, action) {
+    const res = await apiFetch('/api/users/lock', {method:'POST', body: JSON.stringify({user_ids: [id], action})});
+    const data = await res.json();
+    showAlert(data.success ? (action === 'lock' ? '已锁定' : '已解锁') : data.message, data.success ? 'success' : 'danger');
+    loadUsers();
+}
+
+async function autoLockExpired() {
+    if (!confirm('将锁定所有已到期用户，并在 Emby 上禁用账号，确认吗？')) return;
+    const res = await apiFetch('/api/users/auto-lock-expired', {method:'POST'});
+    const data = await res.json();
+    showAlert(`已锁定 ${data.locked} 个到期用户`, 'success');
+    loadUsers();
+}
+
+function showAlert(msg, type) {
+    const box = document.getElementById('alertBox');
+    box.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show">${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`;
+    setTimeout(() => box.innerHTML = '', 4000);
+}
+
+loadUsers();
+</script>
+{% endblock %}

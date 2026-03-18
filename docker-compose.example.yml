@@ -1,0 +1,40 @@
+services:
+  emby-manager:
+    build: .
+    # 或使用现成镜像（推送到 Docker Hub 后填写）:
+    # image: 你的DockerHub用户名/emby-manager:latest
+    container_name: emby-manager
+    ports:
+      - 18080:5000
+    volumes:
+      - ./data:/app/data
+    environment:
+      # 必填项 ──────────────────────────────────────────
+      - FLASK_SECRET_KEY=用python生成: python3 -c "import secrets; print(secrets.token_hex(32))"
+      - ADMIN_PASSWORD=你的管理员密码
+      - EMBY_SERVER_URL=http://你的emby地址:8096
+      - EMBY_API_KEY=你的emby_api_key
+      - COPY_FROM_USER_ID=模板用户ID
+      - PUBLIC_ACCESS_URL=http://你的公网IP:18080
+
+      # 可选：Cloudflare 加速地址
+      # - EMBY_SERVER_URL_CLOUDFLARE=https://emby-cf.your-domain.com
+
+      # 推送通知（不需要的渠道删掉即可）────────────────
+      # - TG_BOT_TOKEN=从@BotFather获取
+      # - TG_ADMIN_CHAT_ID=从@userinfobot获取
+
+      # - WECOM_WEBHOOK=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+      
+      # - DINGTALK_WEBHOOK=https://oapi.dingtalk.com/robot/send?access_token=xxx
+      # - DINGTALK_SECRET=SECxxx
+      
+      # - SERVERCHAN_KEY=SCTxxx
+      
+      # - FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+
+      # 报告推送计划
+      # - REPORT_SCHEDULE=daily,weekly,monthly
+      # - REPORT_HOUR=8
+
+    restart: unless-stopped

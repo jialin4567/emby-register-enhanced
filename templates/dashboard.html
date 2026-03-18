@@ -1,0 +1,187 @@
+{% extends 'layout.html' %}
+{% block title %}数据大盘{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-grid-1x2 me-2"></i>数据大盘</h1>
+    <p>实时播放状态与注册趋势</p>
+</div>
+
+<!-- Stat Cards -->
+<div class="row g-3 mb-4" id="statsRow">
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-value" id="stat-active">—</div>
+                    <div class="stat-label">正在播放</div>
+                </div>
+                <i class="bi bi-play-circle stat-icon text-success"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-value" id="stat-registered">—</div>
+                    <div class="stat-label">累计注册用户</div>
+                </div>
+                <i class="bi bi-people stat-icon" style="color:var(--accent)"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-value" id="stat-expired" style="color:#ef4444">—</div>
+                    <div class="stat-label">已到期用户</div>
+                </div>
+                <i class="bi bi-clock-history stat-icon" style="color:#ef4444"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-value" id="stat-tokens">—</div>
+                    <div class="stat-label">Token 已用/总计</div>
+                </div>
+                <i class="bi bi-ticket-perforated stat-icon" style="color:#f59e0b"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Trend Chart -->
+    <div class="col-lg-8">
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0" style="color:#94a3b8"><i class="bi bi-bar-chart me-2"></i>注册趋势（近30天）</h6>
+                <button class="btn btn-sm btn-outline-secondary" onclick="loadStats()"><i class="bi bi-arrow-clockwise"></i> 刷新</button>
+            </div>
+            <canvas id="trendChart" height="100"></canvas>
+        </div>
+    </div>
+    <!-- Media type breakdown -->
+    <div class="col-lg-4">
+        <div class="card p-3 h-100">
+            <h6 class="mb-3" style="color:#94a3b8"><i class="bi bi-pie-chart me-2"></i>播放类型</h6>
+            <canvas id="typeChart" height="140"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Active Streams -->
+<div class="card mt-3 p-3">
+    <h6 class="mb-3" style="color:#94a3b8"><i class="bi bi-cast me-2"></i>当前在线 <span class="badge bg-success ms-1" id="stream-count">0</span></h6>
+    <div id="streamsContainer"><p class="text-muted small">暂无播放</p></div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+// ── CSRF helper ────────────────────────────────────────────
+function getCsrfToken() {
+    const match = document.cookie.split('; ').find(r => r.startsWith('csrf_token='));
+    return match ? decodeURIComponent(match.split('=')[1]) : '';
+}
+function apiFetch(url, options = {}) {
+    options.headers = Object.assign({
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+    }, options.headers || {});
+    return fetch(url, options);
+}
+let trendChart, typeChart;
+
+async function loadStats() {
+    const [statsRes, trendRes] = await Promise.all([
+        apiFetch('/api/dashboard/stats').then(r => r.json()),
+        apiFetch('/api/dashboard/trend').then(r => r.json())
+    ]);
+
+    document.getElementById('stat-active').textContent = statsRes.active_streams;
+    document.getElementById('stat-registered').textContent = statsRes.total_registered;
+    document.getElementById('stat-expired').textContent = statsRes.expired_users;
+    document.getElementById('stat-tokens').textContent = `${statsRes.used_tokens}/${statsRes.total_tokens}`;
+    document.getElementById('stream-count').textContent = statsRes.active_streams;
+
+    // Streams
+    const container = document.getElementById('streamsContainer');
+    if (statsRes.streams.length === 0) {
+        container.innerHTML = '<p class="text-muted small">暂无播放</p>';
+    } else {
+        container.innerHTML = statsRes.streams.map(s => `
+            <div class="stream-card d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="fw-semibold">${s.user}</span>
+                    <span class="text-muted mx-2">·</span>
+                    <span>${s.series ? s.series + ' · ' : ''}${s.title}</span>
+                </div>
+                <div class="text-end">
+                    <span class="badge badge-active me-1">${s.type}</span>
+                    <small class="text-muted">${s.client} · ${s.device}</small>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Trend chart
+    const tCtx = document.getElementById('trendChart').getContext('2d');
+    if (trendChart) trendChart.destroy();
+    trendChart = new Chart(tCtx, {
+        type: 'bar',
+        data: {
+            labels: trendRes.labels,
+            datasets: [{
+                label: '注册数',
+                data: trendRes.data,
+                backgroundColor: 'rgba(99,102,241,.5)',
+                borderColor: 'rgba(99,102,241,1)',
+                borderWidth: 1,
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true, plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: '#64748b', maxTicksLimit: 10 }, grid: { color: '#2d3148' } },
+                y: { ticks: { color: '#64748b', stepSize: 1 }, grid: { color: '#2d3148' }, beginAtZero: true }
+            }
+        }
+    });
+
+    // Type chart
+    const types = statsRes.media_type_count;
+    const typeCtx = document.getElementById('typeChart').getContext('2d');
+    if (typeChart) typeChart.destroy();
+    if (Object.keys(types).length === 0) {
+        typeCtx.fillStyle = '#64748b';
+        typeCtx.font = '14px sans-serif';
+        typeCtx.textAlign = 'center';
+        typeCtx.fillText('暂无数据', 120, 80);
+    } else {
+        typeChart = new Chart(typeCtx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(types),
+                datasets: [{ data: Object.values(types), backgroundColor: ['#6366f1','#22c55e','#f59e0b','#ef4444'] }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: '#94a3b8' } } }
+            }
+        });
+    }
+}
+
+loadStats();
+setInterval(loadStats, 30000);
+</script>
+{% endblock %}

@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# 数据库和数据（绝对不能上传！含用户数据）
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# 环境变量文件（含密钥！绝对不能上传）
+.env
+.env.*
+docker-compose.override.yml
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 日志
+*.log
+logs/
