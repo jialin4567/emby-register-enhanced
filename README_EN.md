@@ -3,7 +3,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Docker-Supported-blue?style=for-the-badge&logo=docker" alt="Docker">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Version-v1.0.0-orange?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-v1.0.1-orange?style=for-the-badge" alt="Version">
 </p>
 
 A secondary development based on [guowanghushifu/emby-register-service](https://github.com/guowanghushifu/emby-register-service), adding a dashboard, user management, multi-channel notifications, and Telegram Bot remote control while keeping all original features.
@@ -303,6 +303,13 @@ docker compose restart
 ---
 
 ## 📝 Changelog
+
+### v1.0.1 (2025-03-18)
+
+**🐛 Bug Fixes**
+- UUID format normalization — Automatically convert UUIDs without hyphens to standard format, fixing Emby API call failures
+- Template user config sync — Proactively sync Policy and Configuration from template user, preventing Emby from silently ignoring `CopyFromUserId` parameter
+- Force enable new users — Ensure `IsDisabled=False` when creating users, avoiding accidental user disablement
 
 ### v1.0.0 (2024-03-12)
 

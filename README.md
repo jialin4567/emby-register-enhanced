@@ -3,7 +3,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Docker-支持-blue?style=for-the-badge&logo=docker" alt="Docker">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/版本-v1.0.0-orange?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/版本-v1.0.1-orange?style=for-the-badge" alt="Version">
 </p>
 
 基于 [guowanghushifu/emby-register-service](https://github.com/guowanghushifu/emby-register-service) 二次开发，在保留原版全部功能的基础上，新增了数据大盘、用户管理、多渠道推送通知和 Telegram Bot 远程控制。
@@ -303,6 +303,13 @@ docker compose restart
 ---
 
 ## 📝 更新日志
+
+### v1.0.1 (2025-03-18)
+
+**🐛 Bug 修复**
+- UUID 格式标准化 — 自动将无连字符 UUID 转换为标准格式，修复 Emby API 调用失败问题
+- 模板用户配置同步 — 主动从模板用户同步 Policy 和 Configuration，防止 Emby 静默忽略 `CopyFromUserId` 参数
+- 新用户强制启用 — 创建用户时确保 `IsDisabled=False`，避免新用户被意外禁用
 
 ### v1.0.0 (2024-03-12)
 
